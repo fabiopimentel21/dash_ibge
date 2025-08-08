@@ -40,7 +40,7 @@ Este painel é um exemplo de como dados públicos podem ser transformados em con
 
 # Carregando a base
 try:
-    df = pd.read_csv(r'C:\Users\devma\Desktop\DEMANDAS\IBGE\dash_ibge\dados_atualizados\df_editados\base_completa_final.csv')
+    df = pd.read_csv("dados_atualizados/df_editados/base_completa_final.csv")
     st.success("Base de dados carregada com sucesso!")
 except FileNotFoundError:
     st.error("Arquivo 'base_completa_final.csv' não encontrado. Certifique-se de que o arquivo está no caminho correto.")
