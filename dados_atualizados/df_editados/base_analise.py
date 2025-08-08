@@ -38,20 +38,86 @@ O principal objetivo deste dashboard é auxiliar empresas, instituições públi
 Este painel é um exemplo de como dados públicos podem ser transformados em conhecimento valioso quando combinados com boas ferramentas de análise e visualização.
 """)
 
-
-# Carregando a base (usando o arquivo CSV que você forneceu)
+# Carregando a base
 try:
     df = pd.read_csv(r'C:\Users\devma\Desktop\DEMANDAS\IBGE\dash_ibge\dados_atualizados\df_editados\base_completa_final.csv')
     st.success("Base de dados carregada com sucesso!")
 except FileNotFoundError:
-    st.error("Arquivo 'base_completa_final.xlsx - Sheet1.csv' não encontrado. Certifique-se de que o arquivo está no mesmo diretório do script.")
+    st.error("Arquivo 'base_completa_final.csv' não encontrado. Certifique-se de que o arquivo está no caminho correto.")
     st.stop()
+
+# -------------------------------
+# VISÃO GERAL DA CIDADE
+# -------------------------------
+st.subheader("📊 Visão Geral da Cidade de Belém")
+
+# Métricas principais
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    st.metric("População Total", f"{df['Quantidade de moradores'].sum():,.0f}")
+with col2:
+    st.metric("Total Masculino", f"{df['Sexo masculino'].sum():,.0f}")
+with col3:
+    st.metric("Total Feminino", f"{df['Sexo feminino'].sum():,.0f}")
+with col4:
+    renda_media_geral = df["Valor do rendimento nominal médio mensal das pessoas responsáveis com rendimentos por domicílios particulares permanentes ocupados"].mean()
+    st.metric("Renda Média Mensal", f"R$ {renda_media_geral:,.2f}")
+
+st.markdown("---")
+
+# População por Bairro
+pop_bairro = df.groupby("NM_BAIRRO")["Quantidade de moradores"].sum().reset_index()
+fig_pop_bairro = px.bar(pop_bairro, x="NM_BAIRRO", y="Quantidade de moradores",
+                        title="População Total por Bairro",
+                        labels={"Quantidade de moradores": "População", "NM_BAIRRO": "Bairro"})
+st.plotly_chart(fig_pop_bairro, use_container_width=True)
+
+# Distribuição por Sexo
+dados_sexo_total = pd.DataFrame({
+    "Sexo": ["Masculino", "Feminino"],
+    "População": [df["Sexo masculino"].sum(), df["Sexo feminino"].sum()]
+})
+fig_sexo_total = px.bar(dados_sexo_total, x="Sexo", y="População",
+                        title="Distribuição Total por Sexo",
+                        color="Sexo",
+                        labels={"População": "Número de Moradores"})
+st.plotly_chart(fig_sexo_total, use_container_width=True)
+
+# População por Faixa Etária
+colunas_masculino_total = [col for col in df.columns if 'Sexo masculino' in col and 'anos' in col]
+dados_faixa_total = pd.DataFrame({
+    'Faixa Etária': [c.replace('Sexo masculino, ', '') for c in colunas_masculino_total],
+    'Masculino': [df[c].sum() for c in colunas_masculino_total],
+    'Feminino': [df[c.replace('Sexo masculino', 'Sexo feminino')].sum() for c in colunas_masculino_total]
+})
+fig_faixa_total = px.bar(dados_faixa_total, x='Faixa Etária', y=['Masculino', 'Feminino'],
+                         title="Distribuição por Faixa Etária - Total da Cidade",
+                         barmode='group',
+                         labels={'value': 'Número de Moradores', 'variable': 'Sexo'})
+st.plotly_chart(fig_faixa_total, use_container_width=True)
+
+# Dispersão População vs Renda Média
+df_disp = df.groupby("NM_BAIRRO").agg({
+    "Quantidade de moradores": "sum",
+    "Valor do rendimento nominal médio mensal das pessoas responsáveis com rendimentos por domicílios particulares permanentes ocupados": "mean"
+}).reset_index()
+
+fig_disp = px.scatter(df_disp,
+                      x="Quantidade de moradores",
+                      y="Valor do rendimento nominal médio mensal das pessoas responsáveis com rendimentos por domicílios particulares permanentes ocupados",
+                      text="NM_BAIRRO",
+                      title="Correlação entre População e Renda Média por Bairro",
+                      labels={"Quantidade de moradores": "População Total",
+                              "Valor do rendimento nominal médio mensal das pessoas responsáveis com rendimentos por domicílios particulares permanentes ocupados": "Renda Média (R$)"},
+                      size="Quantidade de moradores")
+st.plotly_chart(fig_disp, use_container_width=True)
+
+st.markdown("---")
 
 # -------------------------------
 # Filtros no Sidebar
 # -------------------------------
 st.sidebar.header("Filtros de Bairros")
-
 bairros_unicos = sorted(df["NM_BAIRRO"].unique())
 bairros_selecionados = st.sidebar.multiselect("Selecione um ou mais bairros para análise:", bairros_unicos)
 
