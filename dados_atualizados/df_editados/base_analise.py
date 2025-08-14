@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import numpy as np
 import os
 
 st.set_page_config(layout="wide")
@@ -13,13 +14,11 @@ Este painel interativo foi desenvolvido para proporcionar uma visualização cla
 ---
 
 ### Objetivo
-
 O principal objetivo deste dashboard é auxiliar empresas, instituições públicas, ONGs e pesquisadores na **compreensão do perfil populacional e econômico por bairro**, permitindo decisões mais estratégicas, personalizadas e baseadas em dados.
 
 ---
 
 ### O que você pode analisar neste painel?
-
 - **Distribuição por Gênero e Faixa Etária:** Dados detalhados sobre o número de moradores por sexo e idade, fundamentais para estratégias de marketing segmentado, lançamento de produtos, políticas públicas ou planejamento urbano.
 - **Renda Média e Distribuição Social:** Visualização da renda média mensal e outros indicadores relacionados ao poder de compra, auxiliando na definição de preços, expansão de serviços ou identificação de regiões economicamente vulneráveis.
 - **Tipologia dos Domicílios:** Classificação dos tipos de moradias (casas, apartamentos, vilas, cortiços), útil para mapear demandas por reformas, construção civil ou serviços residenciais.
@@ -27,7 +26,6 @@ O principal objetivo deste dashboard é auxiliar empresas, instituições públi
 ---
 
 ### Aplicações Práticas
-
 - **Empresas:** Análise de mercado por bairro para expansão de unidades, definição de preços e campanhas direcionadas.
 - **Órgãos Públicos:** Planejamento de políticas públicas, ações sociais e alocação de recursos com base em dados reais.
 - **Pesquisadores e ONGs:** Estudo de desigualdade social, urbanismo, saúde pública e inclusão digital.
@@ -38,10 +36,66 @@ O principal objetivo deste dashboard é auxiliar empresas, instituições públi
 Este painel é um exemplo de como dados públicos podem ser transformados em conhecimento valioso quando combinados com boas ferramentas de análise e visualização.
 """)
 
+# Função para remover outliers usando método IQR
+def remover_outliers_iqr(df, colunas):
+    """
+    Remove outliers de colunas específicas usando o método IQR
+    """
+    df_limpo = df.copy()
+    outliers_removidos = {}
+    
+    for coluna in colunas:
+        if coluna in df_limpo.columns:
+            # Calcular Q1, Q3 e IQR
+            Q1 = df_limpo[coluna].quantile(0.25)
+            Q3 = df_limpo[coluna].quantile(0.75)
+            IQR = Q3 - Q1
+            
+            # Definir limites
+            limite_inferior = Q1 - 1.5 * IQR
+            limite_superior = Q3 + 1.5 * IQR
+            
+            # Contar outliers antes da remoção
+            outliers_antes = len(df_limpo)
+            
+            # Remover outliers
+            df_limpo = df_limpo[
+                (df_limpo[coluna] >= limite_inferior) 
+                (df_limpo[coluna] <= limite_superior)
+            ]
+            
+            # Contar outliers removidos
+            outliers_depois = len(df_limpo)
+            outliers_removidos[coluna] = outliers_antes - outliers_depois
+    
+    return df_limpo, outliers_removidos
+
 # Carregando a base
 try:
-    df = pd.read_csv("dados_atualizados/df_editados/base_completa_final.csv")
+    df = pd.read_csv("base_completa_final.csv")
     st.success("Base de dados carregada com sucesso!")
+    
+    # Definir colunas para remoção de outliers
+    colunas_outliers = [
+        "Valor do rendimento nominal médio mensal das pessoas responsáveis com rendimentos por domicílios particulares permanentes ocupados",
+        "Variância do número de moradores em domicílios particulares permanentes ocupados"
+    ]
+    
+    # Remover outliers
+    df_limpo, outliers_info = remover_outliers_iqr(df, colunas_outliers)
+    
+    # Mostrar informações sobre outliers removidos
+    if any(outliers_info.values()):
+        with st.expander("ℹ️ Informações sobre Outliers Removidos"):
+            st.write("**Outliers removidos por variável:**")
+            for coluna, quantidade in outliers_info.items():
+                if quantidade > 0:
+                    st.write(f"- {coluna.replace('Valor do rendimento nominal médio mensal das pessoas responsáveis com rendimentos por domicílios particulares permanentes ocupados', 'Renda Média Mensal')}: {quantidade} registros")
+            st.write(f"**Total de registros:** {len(df)} → {len(df_limpo)} (removidos: {len(df) - len(df_limpo)})")
+    
+    # Usar dataframe limpo para o resto da análise
+    df = df_limpo
+    
 except FileNotFoundError:
     st.error("Arquivo 'base_completa_final.csv' não encontrado. Certifique-se de que o arquivo está no caminho correto.")
     st.stop()
@@ -53,12 +107,16 @@ st.subheader("📊 Visão Geral da Cidade de Belém")
 
 # Métricas principais
 col1, col2, col3, col4 = st.columns(4)
+
 with col1:
     st.metric("População Total", f"{df['Quantidade de moradores'].sum():,.0f}")
+
 with col2:
     st.metric("Total Masculino", f"{df['Sexo masculino'].sum():,.0f}")
+
 with col3:
     st.metric("Total Feminino", f"{df['Sexo feminino'].sum():,.0f}")
+
 with col4:
     renda_media_geral = df["Valor do rendimento nominal médio mensal das pessoas responsáveis com rendimentos por domicílios particulares permanentes ocupados"].mean()
     st.metric("Renda Média Mensal", f"R$ {renda_media_geral:,.2f}")
@@ -67,9 +125,9 @@ st.markdown("---")
 
 # População por Bairro
 pop_bairro = df.groupby("NM_BAIRRO")["Quantidade de moradores"].sum().reset_index()
-fig_pop_bairro = px.bar(pop_bairro, x="NM_BAIRRO", y="Quantidade de moradores",
-                        title="População Total por Bairro",
-                        labels={"Quantidade de moradores": "População", "NM_BAIRRO": "Bairro"})
+fig_pop_bairro = px.bar(pop_bairro, x="NM_BAIRRO", y="Quantidade de moradores", 
+                       title="População Total por Bairro", 
+                       labels={"Quantidade de moradores": "População", "NM_BAIRRO": "Bairro"})
 st.plotly_chart(fig_pop_bairro, use_container_width=True)
 
 # Distribuição por Sexo
@@ -77,10 +135,10 @@ dados_sexo_total = pd.DataFrame({
     "Sexo": ["Masculino", "Feminino"],
     "População": [df["Sexo masculino"].sum(), df["Sexo feminino"].sum()]
 })
-fig_sexo_total = px.bar(dados_sexo_total, x="Sexo", y="População",
-                        title="Distribuição Total por Sexo",
-                        color="Sexo",
-                        labels={"População": "Número de Moradores"})
+
+fig_sexo_total = px.bar(dados_sexo_total, x="Sexo", y="População", 
+                       title="Distribuição Total por Sexo", color="Sexo", 
+                       labels={"População": "Número de Moradores"})
 st.plotly_chart(fig_sexo_total, use_container_width=True)
 
 # População por Faixa Etária
@@ -90,10 +148,10 @@ dados_faixa_total = pd.DataFrame({
     'Masculino': [df[c].sum() for c in colunas_masculino_total],
     'Feminino': [df[c.replace('Sexo masculino', 'Sexo feminino')].sum() for c in colunas_masculino_total]
 })
-fig_faixa_total = px.bar(dados_faixa_total, x='Faixa Etária', y=['Masculino', 'Feminino'],
-                         title="Distribuição por Faixa Etária - Total da Cidade",
-                         barmode='group',
-                         labels={'value': 'Número de Moradores', 'variable': 'Sexo'})
+
+fig_faixa_total = px.bar(dados_faixa_total, x='Faixa Etária', y=['Masculino', 'Feminino'], 
+                        title="Distribuição por Faixa Etária - Total da Cidade", 
+                        barmode='group', labels={'value': 'Número de Moradores', 'variable': 'Sexo'})
 st.plotly_chart(fig_faixa_total, use_container_width=True)
 
 # Dispersão População vs Renda Média
@@ -102,14 +160,16 @@ df_disp = df.groupby("NM_BAIRRO").agg({
     "Valor do rendimento nominal médio mensal das pessoas responsáveis com rendimentos por domicílios particulares permanentes ocupados": "mean"
 }).reset_index()
 
-fig_disp = px.scatter(df_disp,
-                      x="Quantidade de moradores",
-                      y="Valor do rendimento nominal médio mensal das pessoas responsáveis com rendimentos por domicílios particulares permanentes ocupados",
-                      text="NM_BAIRRO",
-                      title="Correlação entre População e Renda Média por Bairro",
-                      labels={"Quantidade de moradores": "População Total",
-                              "Valor do rendimento nominal médio mensal das pessoas responsáveis com rendimentos por domicílios particulares permanentes ocupados": "Renda Média (R$)"},
-                      size="Quantidade de moradores")
+fig_disp = px.scatter(df_disp, 
+                     x="Quantidade de moradores", 
+                     y="Valor do rendimento nominal médio mensal das pessoas responsáveis com rendimentos por domicílios particulares permanentes ocupados",
+                     text="NM_BAIRRO",
+                     title="Correlação entre População e Renda Média por Bairro (Sem Outliers)",
+                     labels={
+                         "Quantidade de moradores": "População Total",
+                         "Valor do rendimento nominal médio mensal das pessoas responsáveis com rendimentos por domicílios particulares permanentes ocupados": "Renda Média (R$)"
+                     },
+                     size="Quantidade de moradores")
 st.plotly_chart(fig_disp, use_container_width=True)
 
 st.markdown("---")
@@ -134,47 +194,40 @@ else:
         
         with st.expander(f"Análise do Bairro: {bairro}", expanded=True):
             st.markdown("---")
-
+            
             # Indicadores de População
             st.subheader("Indicadores de População")
             col1, col2, col3 = st.columns(3)
+            
             with col1:
                 st.metric("População Total", f'{df_bairro["Quantidade de moradores"].iloc[0]:,.0f}')
             with col2:
                 st.metric("Moradores do Sexo Masculino", f'{df_bairro["Sexo masculino"].iloc[0]:,.0f}')
             with col3:
                 st.metric("Moradores do Sexo Feminino", f'{df_bairro["Sexo feminino"].iloc[0]:,.0f}')
-                
+            
             st.markdown("---")
-
+            
             # Métricas de Renda e Domicílios
-            st.subheader("Métricas de Renda e Domicílios")
-            col_renda_1, col_renda_2, col_renda_3, col_renda_4 = st.columns(4)
-
+            st.subheader("Métricas de Renda e Domicílios (Sem Outliers)")
+            col_renda_1, col_renda_2 = st.columns(2)
+            
             try:
-                valor_pessoas_responsaveis = df_bairro["Pessoas responsáveis em domicílios particulares permanentes ocupados"].iloc[0]
+                valor_variancia_moradores = df_bairro["Variância do número de moradores em domicílios particulares permanentes ocupados"].iloc[0]
                 with col_renda_1:
-                    st.metric("Pessoas Responsáveis", f'{valor_pessoas_responsaveis:,.0f}')
-            except KeyError:
+                    st.metric("Variância de Moradores", f'{valor_variancia_moradores:,.2f}')
+            except (KeyError, IndexError):
                 with col_renda_1:
-                    st.warning("Coluna não encontrada: Pessoas responsáveis...")
-
-            try:
-                valor_moradores_por_domicilio = df_bairro["Moradores em domicílios particulares permanentes ocupados"].iloc[0]
-                with col_renda_2:
-                    st.metric("Moradores por Domicílio", f'{valor_moradores_por_domicilio:,.0f}')
-            except KeyError:
-                with col_renda_2:
-                    st.warning("Coluna não encontrada: Moradores em domicílios...")
-
+                    st.warning("Dados não disponíveis")
+            
             try:
                 valor_renda_media = df_bairro["Valor do rendimento nominal médio mensal das pessoas responsáveis com rendimentos por domicílios particulares permanentes ocupados"].iloc[0]
-                with col_renda_3:
+                with col_renda_2:
                     st.metric("Renda Média Mensal", f'R$ {valor_renda_media:,.2f}')
-            except KeyError:
-                with col_renda_3:
-                    st.warning("Coluna não encontrada: Valor do rendimento...")
-
+            except (KeyError, IndexError):
+                with col_renda_2:
+                    st.warning("Dados não disponíveis")
+            
             st.markdown("---")
             
             # Gráfico de População por Sexo
@@ -183,10 +236,10 @@ else:
                 'Sexo': ['Masculino', 'Feminino'],
                 'População': [df_bairro["Sexo masculino"].iloc[0], df_bairro["Sexo feminino"].iloc[0]]
             })
-            fig_sexo = px.bar(dados_sexo, x='Sexo', y='População',
-                              title=f"População do Bairro {bairro} por Sexo",
-                              color='Sexo',
-                              labels={'População': 'Número de Moradores', 'Sexo': 'Sexo'})
+            
+            fig_sexo = px.bar(dados_sexo, x='Sexo', y='População', 
+                             title=f"População do Bairro {bairro} por Sexo", 
+                             color='Sexo', labels={'População': 'Número de Moradores', 'Sexo': 'Sexo'})
             st.plotly_chart(fig_sexo, use_container_width=True)
             
             st.markdown("---")
@@ -200,11 +253,10 @@ else:
                 'Masculino': [df_bairro[c].iloc[0] for c in colunas_masculino],
                 'Feminino': [df_bairro[c.replace('Sexo masculino', 'Sexo feminino')].iloc[0] for c in colunas_masculino]
             })
-
+            
             fig_faixa_etaria = px.bar(dados_faixa_etaria, x='Faixa Etária', y=['Masculino', 'Feminino'],
-                                      title=f"População do Bairro {bairro} por Faixa Etária",
-                                      barmode='group',
-                                      labels={'value': 'Número de Moradores', 'variable': 'Sexo'})
+                                     title=f"População do Bairro {bairro} por Faixa Etária",
+                                     barmode='group', labels={'value': 'Número de Moradores', 'variable': 'Sexo'})
             st.plotly_chart(fig_faixa_etaria, use_container_width=True)
             
             st.markdown("---")
@@ -218,20 +270,21 @@ else:
                     'Apartamento': 'Domicílios Particulares Permanentes Ocupados, Tipo de espécie é apartamento',
                     'Casa de cômodos ou cortiço': 'Domicílios Particulares Permanentes Ocupados, Tipo de espécie é habitação em casa de cômodos ou cortiço'
                 }
-
+                
                 dados_domicilios_particulares = pd.DataFrame({
                     'Tipo de Domicílio': list(colunas_domicilios_particulares.keys()),
                     'Quantidade': [df_bairro[col].iloc[0] for col in colunas_domicilios_particulares.values()]
                 })
-
+                
                 fig_dom_particulares = px.pie(dados_domicilios_particulares, values='Quantidade', names='Tipo de Domicílio',
-                                              title=f"Distribuição de Domicílios Particulares em {bairro}")
+                                             title=f"Distribuição de Domicílios Particulares em {bairro}")
                 st.plotly_chart(fig_dom_particulares, use_container_width=True)
+                
             except KeyError as e:
                 st.warning(f"Erro ao gerar o gráfico de domicílios. A coluna {e} não foi encontrada. Verifique o nome das colunas na sua base de dados.")
 
 # -------------------------------
 # Visualização da base completa
 # -------------------------------
-st.subheader("Visualização da Base de Dados Completa")
+st.subheader("Visualização da Base de Dados Completa (Sem Outliers)")
 st.dataframe(df)
