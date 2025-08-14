@@ -72,7 +72,7 @@ def remover_outliers_iqr(df, colunas):
 
 # Carregando a base
 try:
-    df = pd.read_csv("base_completa_final.csv")
+    df = pd.read_csv("C:\Users\devma\Desktop\DEMANDAS\IBGE\dash_ibge\dados_atualizados\df_editados\base_completa_final.csv")
     st.success("Base de dados carregada com sucesso!")
     
     # Definir colunas para remoção de outliers
