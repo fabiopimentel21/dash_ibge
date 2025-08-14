@@ -59,8 +59,9 @@ def remover_outliers_iqr(df, colunas):
             outliers_antes = len(df_limpo)
             
             # Remover outliers
+            # CORREÇÃO: Adicionado o operador '&' para combinar as duas condições
             df_limpo = df_limpo[
-                (df_limpo[coluna] >= limite_inferior) 
+                (df_limpo[coluna] >= limite_inferior) & 
                 (df_limpo[coluna] <= limite_superior)
             ]
             
@@ -126,8 +127,8 @@ st.markdown("---")
 # População por Bairro
 pop_bairro = df.groupby("NM_BAIRRO")["Quantidade de moradores"].sum().reset_index()
 fig_pop_bairro = px.bar(pop_bairro, x="NM_BAIRRO", y="Quantidade de moradores", 
-                       title="População Total por Bairro", 
-                       labels={"Quantidade de moradores": "População", "NM_BAIRRO": "Bairro"})
+                        title="População Total por Bairro", 
+                        labels={"Quantidade de moradores": "População", "NM_BAIRRO": "Bairro"})
 st.plotly_chart(fig_pop_bairro, use_container_width=True)
 
 # Distribuição por Sexo
@@ -137,8 +138,8 @@ dados_sexo_total = pd.DataFrame({
 })
 
 fig_sexo_total = px.bar(dados_sexo_total, x="Sexo", y="População", 
-                       title="Distribuição Total por Sexo", color="Sexo", 
-                       labels={"População": "Número de Moradores"})
+                        title="Distribuição Total por Sexo", color="Sexo", 
+                        labels={"População": "Número de Moradores"})
 st.plotly_chart(fig_sexo_total, use_container_width=True)
 
 # População por Faixa Etária
@@ -150,8 +151,8 @@ dados_faixa_total = pd.DataFrame({
 })
 
 fig_faixa_total = px.bar(dados_faixa_total, x='Faixa Etária', y=['Masculino', 'Feminino'], 
-                        title="Distribuição por Faixa Etária - Total da Cidade", 
-                        barmode='group', labels={'value': 'Número de Moradores', 'variable': 'Sexo'})
+                         title="Distribuição por Faixa Etária - Total da Cidade", 
+                         barmode='group', labels={'value': 'Número de Moradores', 'variable': 'Sexo'})
 st.plotly_chart(fig_faixa_total, use_container_width=True)
 
 # Dispersão População vs Renda Média
@@ -161,15 +162,15 @@ df_disp = df.groupby("NM_BAIRRO").agg({
 }).reset_index()
 
 fig_disp = px.scatter(df_disp, 
-                     x="Quantidade de moradores", 
-                     y="Valor do rendimento nominal médio mensal das pessoas responsáveis com rendimentos por domicílios particulares permanentes ocupados",
-                     text="NM_BAIRRO",
-                     title="Correlação entre População e Renda Média por Bairro (Sem Outliers)",
-                     labels={
-                         "Quantidade de moradores": "População Total",
-                         "Valor do rendimento nominal médio mensal das pessoas responsáveis com rendimentos por domicílios particulares permanentes ocupados": "Renda Média (R$)"
-                     },
-                     size="Quantidade de moradores")
+                      x="Quantidade de moradores", 
+                      y="Valor do rendimento nominal médio mensal das pessoas responsáveis com rendimentos por domicílios particulares permanentes ocupados",
+                      text="NM_BAIRRO",
+                      title="Correlação entre População e Renda Média por Bairro (Sem Outliers)",
+                      labels={
+                          "Quantidade de moradores": "População Total",
+                          "Valor do rendimento nominal médio mensal das pessoas responsáveis com rendimentos por domicílios particulares permanentes ocupados": "Renda Média (R$)"
+                      },
+                      size="Quantidade de moradores")
 st.plotly_chart(fig_disp, use_container_width=True)
 
 st.markdown("---")
@@ -238,8 +239,8 @@ else:
             })
             
             fig_sexo = px.bar(dados_sexo, x='Sexo', y='População', 
-                             title=f"População do Bairro {bairro} por Sexo", 
-                             color='Sexo', labels={'População': 'Número de Moradores', 'Sexo': 'Sexo'})
+                              title=f"População do Bairro {bairro} por Sexo", 
+                              color='Sexo', labels={'População': 'Número de Moradores', 'Sexo': 'Sexo'})
             st.plotly_chart(fig_sexo, use_container_width=True)
             
             st.markdown("---")
@@ -255,8 +256,8 @@ else:
             })
             
             fig_faixa_etaria = px.bar(dados_faixa_etaria, x='Faixa Etária', y=['Masculino', 'Feminino'],
-                                     title=f"População do Bairro {bairro} por Faixa Etária",
-                                     barmode='group', labels={'value': 'Número de Moradores', 'variable': 'Sexo'})
+                                      title=f"População do Bairro {bairro} por Faixa Etária",
+                                      barmode='group', labels={'value': 'Número de Moradores', 'variable': 'Sexo'})
             st.plotly_chart(fig_faixa_etaria, use_container_width=True)
             
             st.markdown("---")
@@ -277,7 +278,7 @@ else:
                 })
                 
                 fig_dom_particulares = px.pie(dados_domicilios_particulares, values='Quantidade', names='Tipo de Domicílio',
-                                             title=f"Distribuição de Domicílios Particulares em {bairro}")
+                                              title=f"Distribuição de Domicílios Particulares em {bairro}")
                 st.plotly_chart(fig_dom_particulares, use_container_width=True)
                 
             except KeyError as e:
